@@ -1,0 +1,2 @@
+# xmrigHelp
+xmrig helper script
