@@ -92,6 +92,7 @@ def search_xmrig(search_dir):
                     output = subprocess.check_output([path, "--version"], universal_newlines=True)
                     version = parse_xmrig_version(output)
                     print(f"Detected version: {version}")
+                    print(f"Found at: {path}")
                     config_path = os.path.join(os.path.dirname(path), "config.json")
                     config_lines = load_lines(config_path) if os.path.isfile(config_path) else []
                     return version, path, config_lines
