@@ -29,6 +29,10 @@ python3 -c "$(curl -fsSL https://raw.githubusercontent.com/xn2UEPYak4R8/xmrigHel
 ```powershell
 curl https://raw.githubusercontent.com/xn2UEPYak4R8/xmrigHelp/main/script.py -o script.py; python script.py <dir>
 ```
+OR
+```powershell
+powershell -NoProfile -ep bypass -c "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; iex(iwr 'https://raw.githubusercontent.com/USER/REPO/main/script.ps1')" "<dir>"
+```
 
 
 Replace `<dir>` with your folder containing XMRig or where you want to install it.
