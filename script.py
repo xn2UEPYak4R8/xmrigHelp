@@ -110,12 +110,16 @@ def fetch_latest_assets():
         die(f"Failed to fetch release data: {e}")
 
 def find_matching_assets(assets, os_name, arch):
-    os_arch = f"{os_name}-{arch}"
-    return [
-        a for a in assets
-        if os_arch in (a['os'].lower(), a['id'].lower()) or (os_name in a['os'].lower() and arch in a['os'].lower()) or
-        (os_name in a['id'].lower() and arch in a['id'].lower())
-    ]
+    os_name = os_name.lower()
+    arch = arch.lower()
+    matches = []
+    for a in assets:
+        a_id = a.get('id', '').lower()
+        a_os = a.get('os', '').lower()
+        # match if both OS and arch appear in either id or os string
+        if (os_name in a_os and arch in a_os) or (os_name in a_id and arch in a_id):
+            matches.append(a)
+    return matches
 
 def choose_asset(matches):
     print("\nMultiple matching downloads found:")
