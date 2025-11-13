@@ -111,13 +111,16 @@ def fetch_latest_assets():
 
 def find_matching_assets(assets, os_name, arch):
     os_name = os_name.lower()
-    arch = arch.lower()
+    arch   = arch.lower()
     matches = []
     for a in assets:
         a_id = a.get('id', '').lower()
         a_os = a.get('os', '').lower()
-        # match if both OS and arch appear in either id or os string
-        if (os_name in a_os and arch in a_os) or (os_name in a_id and arch in a_id):
+        # Normal case: exact match
+        if os_name in a_os and arch in a_os:
+            matches.append(a)
+        # Fallback for ARM64 Linux: use static x64 build
+        elif os_name == 'linux' and arch == 'arm64' and 'linux-static-x64' in a_id:
             matches.append(a)
     return matches
 
