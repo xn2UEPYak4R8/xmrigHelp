@@ -240,6 +240,7 @@ if result:
     chosen = matches[0] if len(matches) == 1 else choose_asset(matches)
     download_asset(chosen, SEARCH_DIR)
     preserve_config(old_path, old_config, SEARCH_DIR)
+    update_config_json(os.path.dirname(old_path))
 else:
     print(f"'xmrig' not found in '{SEARCH_DIR}'.")
     if input("Download latest version of xmrig? [y/N] ").strip().lower() in ('y', 'yes'):
