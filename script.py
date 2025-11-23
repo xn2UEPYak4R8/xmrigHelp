@@ -122,7 +122,7 @@ def download_and_extract(url, dest_dir):
             zf.extractall(dest_dir)
     elif filepath.endswith(".tar.gz"):
         with tarfile.open(filepath, "r:gz") as tf:
-            tf.extractall(dest_dir)
+            tf.extractall(dest_dir, filter="data")
     else:
         die("Unknown archive format")
     os.remove(filepath)
