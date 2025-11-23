@@ -72,22 +72,40 @@ def fetch_latest_github_release():
         return version, assets
 
 def select_asset(assets, os_name, arch, ubuntu_codename=""):
+    names = [a["name"] for a in assets]
     candidates = []
+
     if os_name == "linux":
         if ubuntu_codename:
             candidates.append(f"{ubuntu_codename}-{arch}")
-        candidates.append(f"noble-{arch}")
-        candidates.append(f"static-{arch}")
+        candidates += [
+            f"noble-{arch}",
+            f"jammy-{arch}",
+            f"focal-{arch}",
+        ]
+        candidates.append(f"linux-static-{arch}")
     elif os_name == "windows":
-        candidates.append(f"windows-{arch}")
-    elif os_name == "macos":
-        candidates.append(f"macos-{arch}")
+        candidates += [
+            f"windows-{arch}",
+            f"windows-gcc-{arch}",
+            f"windows-arm64",
+        ]
+    elif os_name == "darwin" or os_name == "macos":
+        candidates += [
+            f"macos-{arch}",
+            "macos-x64",
+            "macos-arm64",
+        ]
     else:
         die(f"Unsupported OS: {os_name}")
 
-    for suffix in candidates:
+    for frag in candidates:
         for asset in assets:
-            if suffix in asset["name"]:
+            if frag in asset["name"]:
+                return asset["browser_download_url"]
+    if os_name == "linux":
+        for asset in assets:
+            if "linux-static-x64" in asset["name"]:
                 return asset["browser_download_url"]
     die("No suitable asset found for your system.")
 
