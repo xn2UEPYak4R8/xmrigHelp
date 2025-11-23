@@ -59,20 +59,17 @@ def search_xmrig(search_dir):
                     output = subprocess.check_output([path, "--version"], text=True)
                     version = parse_xmrig_version(output)
                     if version:
-                        return version, path
+                        return version
                 except:
                     continue
-    return None, None
+    return None
 
 def fetch_latest_github_release():
-    try:
-        with urllib.request.urlopen(GITHUB_API_RELEASES) as resp:
-            data = json.load(resp)
-            version = data["tag_name"].lstrip("v")
-            assets = data.get("assets", [])
-            return version, assets
-    except Exception as e:
-        die(f"Failed to fetch latest release info: {e}")
+    with urllib.request.urlopen(GITHUB_API_RELEASES) as resp:
+        data = json.load(resp)
+        version = data["tag_name"].lstrip("v")
+        assets = data.get("assets", [])
+        return version, assets
 
 def select_asset(assets, os_name, arch, ubuntu_codename=""):
     candidates = []
@@ -113,45 +110,35 @@ def download_and_extract(url, dest_dir):
     os.remove(filepath)
     print("Extraction complete.")
 
-def preserve_config(extracted_dir):
+def update_config_json(extracted_dir):
     config_path = os.path.join(extracted_dir, "config.json")
-    if os.path.exists(config_path):
-        print("Config file already exists, leaving it intact.")
-    else:
-        config = {
-            "pools": [
-                {
-                    "url": "pool.hashvault.pro:443",
-                    "user": "YOUR_WALLET_ADDRESS_HERE",
-                    "pass": f"{datetime.now():%Y%m%d}{socket.gethostname()}",
-                    "tls": True
-                }
-            ]
-        }
-        with open(config_path, "w") as f:
-            json.dump(config, f, indent=4)
-        print("Created new default config.json.")
+    config = {
+        "pools": [
+            {
+                "url": "pool.hashvault.pro:443",
+                "user": "YOUR_WALLET_ADDRESS_HERE",
+                "pass": f"{datetime.now():%Y%m%d}{socket.gethostname()}",
+                "tls": True
+            }
+        ]
+    }
+    with open(config_path, "w") as f:
+        json.dump(config, f, indent=4)
+    print("Custom config.json applied.")
 
 def compare_versions(v1, v2):
-    def parse(v):
-        return [int(x) for x in v.split(".")]
-    return parse(v1) < parse(v2)
+    return [int(x) for x in v1.split(".")] < [int(x) for x in v2.split(".")]
 
 def main():
     search_dir = validate_input()
     os_name, arch, ubuntu_codename = detect_system()
-    installed_version, old_path = search_xmrig(search_dir)
-
-    if installed_version:
-        print(f"Found XMRig version {installed_version} at {old_path}")
-    else:
-        print("No existing XMRig found.")
+    installed_version = search_xmrig(search_dir)
 
     latest_version, assets = fetch_latest_github_release()
     print(f"Latest release: {latest_version}")
 
     if installed_version and not compare_versions(installed_version, latest_version):
-        print("XMRig is already up-to-date. No download needed.")
+        print(f"Installed version {installed_version} is up-to-date. Nothing to do.")
         return
 
     url = select_asset(assets, os_name, arch, ubuntu_codename)
@@ -160,8 +147,8 @@ def main():
     # Extracted folder is always xmrig-<version>
     extracted_dir = os.path.join(search_dir, f"xmrig-{latest_version}")
     if os.path.isdir(extracted_dir):
-        preserve_config(extracted_dir)
-        print("Update complete.")
+        update_config_json(extracted_dir)
+        print(f"XMRig {latest_version} installed successfully.")
 
 if __name__ == "__main__":
     main()
