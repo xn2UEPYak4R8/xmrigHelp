@@ -13,7 +13,6 @@ from datetime import datetime
 import socket
 
 GITHUB_API_RELEASES = "https://api.github.com/repos/xmrig/xmrig/releases/latest"
-GITHUB_BASE = "https://github.com/xmrig/xmrig/releases/download"
 
 def die(msg):
     print(f"Error: {msg}", file=sys.stderr)
@@ -89,7 +88,6 @@ def select_asset(assets, os_name, arch, ubuntu_codename=""):
     else:
         die(f"Unsupported OS: {os_name}")
 
-    # Try to match asset name
     for suffix in candidates:
         for asset in assets:
             if suffix in asset["name"]:
@@ -120,7 +118,6 @@ def preserve_config(extracted_dir):
     if os.path.exists(config_path):
         print("Config file already exists, leaving it intact.")
     else:
-        # Create a minimal default config
         config = {
             "pools": [
                 {
@@ -135,17 +132,27 @@ def preserve_config(extracted_dir):
             json.dump(config, f, indent=4)
         print("Created new default config.json.")
 
+def compare_versions(v1, v2):
+    def parse(v):
+        return [int(x) for x in v.split(".")]
+    return parse(v1) < parse(v2)
+
 def main():
     search_dir = validate_input()
     os_name, arch, ubuntu_codename = detect_system()
-    version, old_path = search_xmrig(search_dir)
-    if version:
-        print(f"Found XMRig version {version} at {old_path}")
+    installed_version, old_path = search_xmrig(search_dir)
+    if installed_version:
+        print(f"Found XMRig version {installed_version} at {old_path}")
     else:
         print("No existing XMRig found.")
 
     latest_version, assets = fetch_latest_github_release()
     print(f"Latest release: {latest_version}")
+
+    if installed_version and not compare_versions(installed_version, latest_version):
+        print("XMRig is already up-to-date. No download needed.")
+        return
+
     url = select_asset(assets, os_name, arch, ubuntu_codename)
     download_and_extract(url, search_dir)
 
@@ -154,6 +161,7 @@ def main():
     extracted_dir = os.path.join(search_dir, base_name)
     if os.path.isdir(extracted_dir):
         preserve_config(extracted_dir)
+        print("Update complete.")
 
 if __name__ == "__main__":
     main()
