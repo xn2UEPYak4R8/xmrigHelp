@@ -141,6 +141,7 @@ def main():
     search_dir = validate_input()
     os_name, arch, ubuntu_codename = detect_system()
     installed_version, old_path = search_xmrig(search_dir)
+
     if installed_version:
         print(f"Found XMRig version {installed_version} at {old_path}")
     else:
@@ -156,9 +157,8 @@ def main():
     url = select_asset(assets, os_name, arch, ubuntu_codename)
     download_and_extract(url, search_dir)
 
-    # Determine extracted directory
-    base_name = os.path.basename(urlparse(url).path).split(".tar.gz")[0].split(".zip")[0]
-    extracted_dir = os.path.join(search_dir, base_name)
+    # Extracted folder is always xmrig-<version>
+    extracted_dir = os.path.join(search_dir, f"xmrig-{latest_version}")
     if os.path.isdir(extracted_dir):
         preserve_config(extracted_dir)
         print("Update complete.")
