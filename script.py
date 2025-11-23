@@ -1,17 +1,19 @@
+#!/usr/bin/env python3
 import os
 import sys
 import platform
 import subprocess
 import urllib.request
-import json
 import tarfile
 import zipfile
+import json
+import re
 from urllib.parse import urlparse
 from datetime import datetime
 import socket
-import shutil
 
-# Helpers
+GITHUB_API_RELEASES = "https://api.github.com/repos/xmrig/xmrig/releases/latest"
+GITHUB_BASE = "https://github.com/xmrig/xmrig/releases/download"
 
 def die(msg):
     print(f"Error: {msg}", file=sys.stderr)
@@ -25,197 +27,133 @@ def validate_input():
         die(f"Provided argument is not a directory: {path}")
     return path
 
-# System detection
-
 def detect_system():
-    os_map = {"linux": "linux", "darwin": "macos", "windows": "windows"}
+    os_name = platform.system().lower()
+    arch_map = {
+        'x86_64': 'x64', 'amd64': 'x64',
+        'i386': 'x86', 'i686': 'x86',
+        'aarch64': 'arm64', 'arm64': 'arm64'
+    }
+    arch = arch_map.get(platform.machine().lower(), 'x64')
 
-    raw_os = platform.system().lower()
-    os_name = os_map.get(raw_os, raw_os)
-
-    machine = platform.machine().lower()
-    if machine in ("x86_64", "amd64"):
-        arch = "x64"
-    elif machine in ("i386", "i686"):
-        arch = "x86"
-    elif machine in ("arm64", "aarch64"):
-        arch = "arm64"
-    else:
-        arch = machine
-
-    print(f"Detected OS: {os_name}")
-    print(f"Detected Arch: {arch}")
-    return os_name, arch
-
-# GitHub release handling
-
-def fetch_latest_release():
-    url = "https://api.github.com/repos/xmrig/xmrig/releases/latest"
-    try:
-        with urllib.request.urlopen(url) as resp:
-            return json.loads(resp.read().decode())
-    except Exception as e:
-        die(f"Failed to fetch GitHub release data: {e}")
-
-def find_matching_asset(assets, os_name, arch):
-    os_name = os_name.lower()
-    arch = arch.lower()
-    for a in assets:
-        name = a["name"].lower()
-        if os_name in name and arch in name:
-            return a
-    # Simple fallback — Linux arm64 → static x64
-    if os_name == "linux" and arch == "arm64":
-        for a in assets:
-            if "linux-static-x64" in a["name"].lower():
-                return a
-    return None
-
-def is_newer_version(installed, latest):
-    latest = latest.lstrip("v")
-
-    def parse(v): return tuple(map(int, v.split(".")))
-
-    return parse(latest) > parse(installed)
-
-# XMRig local detection
+    ubuntu_codename = ""
+    if os_name == "linux":
+        try:
+            with open("/etc/os-release") as f:
+                m = re.search(r'VERSION_CODENAME=(\w+)', f.read())
+                if m:
+                    ubuntu_codename = m.group(1)
+        except:
+            pass
+    return os_name, arch, ubuntu_codename
 
 def parse_xmrig_version(output):
-    import re
-    m = re.search(r"\b(\d+\.\d+\.\d+)\b", output)
-    return m.group(1) if m else None
+    m = re.search(r'\b\d+\.\d+\.\d+\b', output)
+    return m.group(0) if m else None
 
-def find_xmrig(search_dir):
+def search_xmrig(search_dir):
     for root, _, files in os.walk(search_dir):
-        for f in files:
-            if f.lower() in ("xmrig", "xmrig.exe"):
-                path = os.path.join(root, f)
+        for name in files:
+            if name.lower() in ('xmrig', 'xmrig.exe'):
+                path = os.path.join(root, name)
                 try:
-                    out = subprocess.check_output([path, "--version"], universal_newlines=True)
-                    version = parse_xmrig_version(out)
+                    output = subprocess.check_output([path, "--version"], text=True)
+                    version = parse_xmrig_version(output)
                     if version:
-                        print(f"Found XMRig {version} at {path}")
-                        config_path = os.path.join(os.path.dirname(path), "config.json")
-                        config_backup = open(config_path).read() if os.path.exists(config_path) else None
-                        return version, path, config_backup
-                except Exception:
-                    pass
-    return None
+                        return version, path
+                except:
+                    continue
+    return None, None
 
-# Config handling
-
-def update_config_json(folder):
-    config_path = os.path.join(folder, "config.json")
-    if not os.path.exists(config_path):
-        print("No config.json to update.")
-        return
-
+def fetch_latest_github_release():
     try:
-        with open(config_path, "r") as f:
-            cfg = json.load(f)
-
-        if "pools" in cfg and isinstance(cfg["pools"], list) and cfg["pools"]:
-            pool = cfg["pools"][0]
-            pool["url"] = "pool.hashvault.pro:443"
-            pool["user"] = "4AUvAWKacmtPxR6xEYnZPSBZgVuwNtP4iKxsUsXAT9GGjCyrCuVkGhhcSQVxVo3zWDUYWCGMyHfavheUH3Hmjf49MzvBEfu"
-            pool["pass"] = f"{datetime.now():%Y%m%d}{socket.gethostname()}"
-            pool["tls"] = True
-            pool["tls-fingerprint"] = "420c7850e09b7c0bdcf748a7da9eb3647daf8515718f36d9ccfdd6b9ff834b14"
-
-        with open(config_path, "w") as f:
-            json.dump(cfg, f, indent=4)
-
-        print("Updated config.json")
-
+        with urllib.request.urlopen(GITHUB_API_RELEASES) as resp:
+            data = json.load(resp)
+            version = data["tag_name"].lstrip("v")
+            assets = data.get("assets", [])
+            return version, assets
     except Exception as e:
-        print(f"Failed to update config.json: {e}")
+        die(f"Failed to fetch latest release info: {e}")
 
-# Extraction + Download
+def select_asset(assets, os_name, arch, ubuntu_codename=""):
+    candidates = []
+    if os_name == "linux":
+        if ubuntu_codename:
+            candidates.append(f"{ubuntu_codename}-{arch}")
+        candidates.append(f"noble-{arch}")
+        candidates.append(f"static-{arch}")
+    elif os_name == "windows":
+        candidates.append(f"windows-{arch}")
+    elif os_name == "macos":
+        candidates.append(f"macos-{arch}")
+    else:
+        die(f"Unsupported OS: {os_name}")
 
-def extract_archive(filepath, dest_dir):
-    print(f"Extracting: {filepath}")
-    before = set(os.listdir(dest_dir))
+    # Try to match asset name
+    for suffix in candidates:
+        for asset in assets:
+            if suffix in asset["name"]:
+                return asset["browser_download_url"]
+    die("No suitable asset found for your system.")
 
-    try:
-        if filepath.endswith(".zip"):
-            with zipfile.ZipFile(filepath) as zf:
-                zf.extractall(dest_dir)
-        elif filepath.endswith((".tar.gz", ".tgz")):
-            with tarfile.open(filepath, "r:gz") as tf:
-                tf.extractall(dest_dir)
-        else:
-            die("Unknown archive type")
-
-        os.remove(filepath)
-
-        after = set(os.listdir(dest_dir))
-        new_items = list(after - before)
-        if not new_items:
-            print("No new directory extracted.")
-            return None
-
-        new_dir = os.path.join(dest_dir, new_items[0])
-        if not os.path.isdir(new_dir):
-            return None
-
-        update_config_json(new_dir)
-        return new_dir
-
-    except Exception as e:
-        die(f"Extraction failed: {e}")
-
-def download_asset(asset, dest_dir):
-    url = asset["browser_download_url"]
+def download_and_extract(url, dest_dir):
     filename = os.path.basename(urlparse(url).path)
     filepath = os.path.join(dest_dir, filename)
-
-    print(f"Downloading: {filename}")
-
-    try:
-        urllib.request.urlretrieve(url, filepath)
-    except Exception as e:
-        die(f"Download failed: {e}")
-
+    print(f"Downloading {filename}...")
+    urllib.request.urlretrieve(url, filepath)
     print("Download complete.")
-    return extract_archive(filepath, dest_dir)
 
-# Main
+    print("Extracting...")
+    if filepath.endswith(".zip"):
+        with zipfile.ZipFile(filepath, 'r') as zf:
+            zf.extractall(dest_dir)
+    elif filepath.endswith(".tar.gz"):
+        with tarfile.open(filepath, "r:gz") as tf:
+            tf.extractall(dest_dir)
+    else:
+        die("Unknown archive format")
+    os.remove(filepath)
+    print("Extraction complete.")
 
-SEARCH_DIR = validate_input()
-os_name, arch = detect_system()
+def preserve_config(extracted_dir):
+    config_path = os.path.join(extracted_dir, "config.json")
+    if os.path.exists(config_path):
+        print("Config file already exists, leaving it intact.")
+    else:
+        # Create a minimal default config
+        config = {
+            "pools": [
+                {
+                    "url": "pool.hashvault.pro:443",
+                    "user": "YOUR_WALLET_ADDRESS_HERE",
+                    "pass": f"{datetime.now():%Y%m%d}{socket.gethostname()}",
+                    "tls": True
+                }
+            ]
+        }
+        with open(config_path, "w") as f:
+            json.dump(config, f, indent=4)
+        print("Created new default config.json.")
 
-found = find_xmrig(SEARCH_DIR)
-latest = fetch_latest_release()
-latest_ver = latest["tag_name"].lstrip("v")
+def main():
+    search_dir = validate_input()
+    os_name, arch, ubuntu_codename = detect_system()
+    version, old_path = search_xmrig(search_dir)
+    if version:
+        print(f"Found XMRig version {version} at {old_path}")
+    else:
+        print("No existing XMRig found.")
 
-if found:
-    installed_ver, old_path, old_cfg = found
+    latest_version, assets = fetch_latest_github_release()
+    print(f"Latest release: {latest_version}")
+    url = select_asset(assets, os_name, arch, ubuntu_codename)
+    download_and_extract(url, search_dir)
 
-    if not is_newer_version(installed_ver, latest_ver):
-        print("Already up to date.")
-        sys.exit(0)
+    # Determine extracted directory
+    base_name = os.path.basename(urlparse(url).path).split(".tar.gz")[0].split(".zip")[0]
+    extracted_dir = os.path.join(search_dir, base_name)
+    if os.path.isdir(extracted_dir):
+        preserve_config(extracted_dir)
 
-    print(f"New XMRig version available: {latest_ver}")
-
-    asset = find_matching_asset(latest["assets"], os_name, arch)
-    if not asset:
-        die("No matching asset found.")
-
-    new_dir = download_asset(asset, SEARCH_DIR)
-
-    if new_dir and old_cfg:
-        try:
-            cfg_path = os.path.join(new_dir, "config.json")
-            with open(cfg_path, "w") as f:
-                f.write(old_cfg)
-            print("Preserved existing config.json")
-        except Exception:
-            print("Failed to restore old config.json")
-
-else:
-    print("XMRig not found.")
-    asset = find_matching_asset(latest["assets"], os_name, arch)
-    if not asset:
-        die("No matching asset found.")
-    download_asset(asset, SEARCH_DIR)
-    print("Downloaded the latest XMRig.")
+if __name__ == "__main__":
+    main()
