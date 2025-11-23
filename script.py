@@ -76,21 +76,21 @@ def select_asset(assets, os_name, arch, ubuntu_codename=""):
     candidates = []
 
     if os_name == "linux":
-    if ubuntu_codename:
-        candidates.append(f"{ubuntu_codename}-{arch}")
-    candidates.append(f"linux-static-{arch}")
-    candidates += [
-        f"noble-{arch}",
-        f"jammy-{arch}",
-        f"focal-{arch}",
-    ]
+        if ubuntu_codename:
+            candidates.append(f"{ubuntu_codename}-{arch}")
+        candidates.append(f"linux-static-{arch}")
+        candidates += [
+            f"noble-{arch}",
+            f"jammy-{arch}",
+            f"focal-{arch}",
+        ]
     elif os_name == "windows":
         candidates += [
             f"windows-{arch}",
             f"windows-gcc-{arch}",
-            f"windows-arm64",
+            "windows-arm64",
         ]
-    elif os_name == "darwin" or os_name == "macos":
+    elif os_name in ("darwin", "macos"):
         candidates += [
             f"macos-{arch}",
             "macos-x64",
