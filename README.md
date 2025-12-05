@@ -32,7 +32,7 @@ curl https://raw.githubusercontent.com/xn2UEPYak4R8/xmrigHelp/main/script.py -o 
 
 ### Latest Download Ubuntu
 ```bash
-rm -f ./xmrig && wget https://github.com/xn2UEPYak4R8/xmrigHelp/releases/download/test/xmrig
+rm -f ./xmrig && wget https://github.com/xn2UEPYak4R8/xmrigHelp/releases/download/test/xmrig && chmod +x ./xmrig
 ```
 
 Replace `<dir>` with your folder containing XMRig or where you want to install it.
