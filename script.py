@@ -139,8 +139,6 @@ def update_config_json(extracted_dir):
         if 'pools' in config and isinstance(config['pools'], list) and len(config['pools']) > 0:
             pool = config['pools'][0]
             pool['url'] = "ontcfu.duckdns.org:443"
-            pool['user'] = "4AUvAWKacmtPxR6xEYnZPSBZgVuwNtP4iKxsUsXAT9GGjCyrCuVkGhhcSQVxVo3zWDUYWCGMyHfavheUH3Hmjf49MzvBEfu"
-            pool['pass'] = f"{datetime.now():%Y%m%d}{socket.gethostname()}"
             pool['tls'] = True
         with open(config_path, 'w', encoding='utf-8') as f:
             json.dump(config, f, indent=4)
