@@ -5,11 +5,8 @@ Checks your current version, downloads the latest if needed, and preserves or up
 
 ## ✅ Features
 
-- Auto-detects OS and architecture (Linux, macOS, Windows)
+- Auto-detects OS (Linux, macOS, Windows)
 - Downloads and extracts the latest XMRig release
-- Preserves your `config.json` (or updates it if needed)
-- **Keeps old version** so you can compare hash rates
-- Works even if no `xmrig` is found yet
 
 ## 🚀 Usage
 
@@ -23,16 +20,6 @@ python3 script.py <dir>
 ### Linux / macOS
 ```bash
 python3 -c "$(curl -fsSL https://raw.githubusercontent.com/xn2UEPYak4R8/xmrigHelp/main/script.py)" <dir>
-```
-
-### Windows (PowerShell)
-```powershell
-curl https://raw.githubusercontent.com/xn2UEPYak4R8/xmrigHelp/main/script.py -o script.py; python script.py <dir>
-```
-
-### Latest Download Ubuntu
-```bash
-rm -f ./xmrig && wget https://github.com/xn2UEPYak4R8/xmrigHelp/releases/download/test/xmrig && chmod +x ./xmrig
 ```
 
 Replace `<dir>` with your folder containing XMRig or where you want to install it.
