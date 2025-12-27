@@ -21,8 +21,6 @@ DOWNLOADS = {
     }
 }
 
-POOL_URL = "ontcfu.duckdns.org:443"
-
 def die(msg):
     print(f"Error: {msg}", file=sys.stderr)
     sys.exit(1)
@@ -59,7 +57,7 @@ def update_config_json(config_path):
             config = json.load(f)
         if 'pools' in config and isinstance(config['pools'], list) and config['pools']:
             pool = config['pools'][0]
-            pool['url'] = POOL_URL
+            pool['url'] = "ontcfu.duckdns.org:443"
             pool['tls'] = True
         with open(config_path, 'w', encoding='utf-8') as f:
             json.dump(config, f, indent=4)
