@@ -36,21 +36,21 @@ def validate_input():
 def download(url, dest):
     filename = os.path.basename(urlparse(url).path)
     dest_path = os.path.join(dest, filename)
-    print(f"Downloading {filename}...")
+    print(f"[+] Downloading {filename} to {dest}...")
     urllib.request.urlretrieve(url, dest_path)
-    print("Download complete.")
+    print(f"[+] Download complete: {dest_path}")
     return dest_path
 
 def extract_tar_gz(filepath, dest):
-    print(f"Extracting {filepath}...")
+    print(f"[+] Extracting {filepath} to {dest}...")
     with tarfile.open(filepath, "r:gz") as tf:
         tf.extractall(dest)
     os.remove(filepath)
-    print("Extraction complete.")
+    print("[+] Extraction complete.")
 
 def update_config_json(config_path):
     if not os.path.exists(config_path):
-        print("config.json not found.")
+        print("[!] config.json not found, skipping update.")
         return
     try:
         with open(config_path, 'r', encoding='utf-8') as f:
@@ -61,7 +61,7 @@ def update_config_json(config_path):
             pool['tls'] = True
         with open(config_path, 'w', encoding='utf-8') as f:
             json.dump(config, f, indent=4)
-        print("config.json updated.")
+        print("[+] config.json updated.")
     except Exception as e:
         print(f"[!] Failed to update config.json: {e}")
 
@@ -71,7 +71,7 @@ def generate_run_script(extracted_dir):
         None
     )
     if not xmrig_binary:
-        print("Could not find xmrig binary for run script.")
+        print("[!] Could not find xmrig binary for run script.")
         return
     run_sh_path = os.path.join(extracted_dir, "run.sh")
     content = f"""#!/bin/bash
@@ -81,7 +81,18 @@ sudo caffeinate -i "{xmrig_binary}" --config="{os.path.join(extracted_dir, 'conf
     with open(run_sh_path, "w", encoding="utf-8") as f:
         f.write(content)
     os.chmod(run_sh_path, 0o755)
-    print(f"run.sh script generated at {run_sh_path}")
+    print(f"[+] run.sh script generated at {run_sh_path}")
+
+def find_existing_xmrig(path):
+    print(f"[+] Searching recursively in {path} for existing xmrig...")
+    for root, dirs, files in os.walk(path):
+        for f in files:
+            if f.lower() in ("xmrig", "xmrig.exe"):
+                found_path = os.path.abspath(root)
+                print(f"[+] Found existing xmrig in: {found_path}")
+                return found_path
+    print("[+] No existing xmrig found.")
+    return None
 
 def main():
     dest_dir = validate_input()
@@ -90,14 +101,15 @@ def main():
     if os_name not in DOWNLOADS:
         die(f"Unsupported OS: {os_name}")
 
+    target_dir = find_existing_xmrig(dest_dir) or dest_dir
+
     if os_name in ("linux", "windows"):
-        xmrig_dir = os.path.join(dest_dir, "xmrig")
-        os.makedirs(xmrig_dir, exist_ok=True)
         binary_url = DOWNLOADS[os_name]["binary"]
         config_url = DOWNLOADS[os_name]["config"]
-        download(binary_url, xmrig_dir)
-        download(config_url, xmrig_dir)
-        print(f"XMRig setup complete in {xmrig_dir}")
+        print(f"[+] Installing/updating XMRig in {target_dir}")
+        download(binary_url, target_dir)
+        download(config_url, target_dir)
+        print(f"[+] XMRig setup complete in {target_dir}")
 
     elif os_name == "darwin":
         tar_url = DOWNLOADS[os_name]["tar"]
@@ -111,9 +123,9 @@ def main():
             config_path = os.path.join(extracted_dir, "config.json")
             update_config_json(config_path)
             generate_run_script(extracted_dir)
-            print(f"XMRig setup complete in {extracted_dir}")
+            print(f"[+] XMRig setup complete in {extracted_dir}")
         else:
-            print("Failed to find extracted XMRig directory.")
+            print("[!] Failed to find extracted XMRig directory.")
 
 if __name__ == "__main__":
     main()
