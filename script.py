@@ -22,7 +22,7 @@ DOWNLOADS = {
 }
 
 def die(msg):
-    print(f"Error: {msg}", file=sys.stderr)
+    print(f"[!] Error: {msg}", file=sys.stderr)
     sys.exit(1)
 
 def validate_input():
@@ -33,18 +33,18 @@ def validate_input():
         die(f"Provided argument is not a directory: {path}")
     return path
 
-def download(url, dest):
+def download(url, dest_dir):
     filename = os.path.basename(urlparse(url).path)
-    dest_path = os.path.join(dest, filename)
-    print(f"[+] Downloading {filename} to {dest}...")
+    dest_path = os.path.join(dest_dir, filename)
+    print(f"[+] Downloading {filename} to {dest_dir}...")
     urllib.request.urlretrieve(url, dest_path)
     print(f"[+] Download complete: {dest_path}")
     return dest_path
 
-def extract_tar_gz(filepath, dest):
-    print(f"[+] Extracting {filepath} to {dest}...")
+def extract_tar_gz(filepath, dest_dir):
+    print(f"[+] Extracting {filepath} to {dest_dir}...")
     with tarfile.open(filepath, "r:gz") as tf:
-        tf.extractall(dest)
+        tf.extractall(dest_dir)
     os.remove(filepath)
     print("[+] Extraction complete.")
 
@@ -88,9 +88,9 @@ def find_existing_xmrig(path):
     for root, dirs, files in os.walk(path):
         for f in files:
             if f.lower() in ("xmrig", "xmrig.exe"):
-                found_path = os.path.abspath(root)
-                print(f"[+] Found existing xmrig in: {found_path}")
-                return found_path
+                binary_path = os.path.join(root, f)
+                print(f"[+] Found existing xmrig binary at: {binary_path}")
+                return binary_path
     print("[+] No existing xmrig found.")
     return None
 
@@ -101,12 +101,19 @@ def main():
     if os_name not in DOWNLOADS:
         die(f"Unsupported OS: {os_name}")
 
-    target_dir = find_existing_xmrig(dest_dir) or dest_dir
-
     if os_name in ("linux", "windows"):
         binary_url = DOWNLOADS[os_name]["binary"]
         config_url = DOWNLOADS[os_name]["config"]
-        print(f"[+] Installing/updating XMRig in {target_dir}")
+
+        existing_binary = find_existing_xmrig(dest_dir)
+        if existing_binary:
+            target_dir = os.path.dirname(existing_binary)
+            print(f"[+] Updating existing XMRig in {target_dir}")
+        else:
+            target_dir = dest_dir
+            os.makedirs(target_dir, exist_ok=True)
+            print(f"[+] Installing new XMRig in {target_dir}")
+
         download(binary_url, target_dir)
         download(config_url, target_dir)
         print(f"[+] XMRig setup complete in {target_dir}")
@@ -115,8 +122,10 @@ def main():
         tar_url = DOWNLOADS[os_name]["tar"]
         tar_path = download(tar_url, dest_dir)
         extract_tar_gz(tar_path, dest_dir)
+
+        # look for extracted directory
         extracted_dir = next(
-            (os.path.join(dest_dir, d) for d in os.listdir(dest_dir) if d.startswith("xmrig-")),
+            (os.path.join(dest_dir, d) for d in os.listdir(dest_dir) if d.startswith("xmrig-") and os.path.isdir(os.path.join(dest_dir, d))),
             None
         )
         if extracted_dir:
