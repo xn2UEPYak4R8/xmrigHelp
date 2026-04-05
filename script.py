@@ -62,7 +62,16 @@ def installed_version(binary):
             if p[:1].isdigit() and "." in p: return p
     except: pass
 
-def ask(q): return input(f"{q} [y/N]: ").strip().lower() in ("y", "yes")
+def ask(q):
+    try:
+        if sys.stdin.isatty():
+            return input(f"{q} [y/N]: ").strip().lower() in ("y", "yes")
+        with open("/dev/tty") as tty:
+            sys.stdout.write(f"{q} [y/N]: ")
+            sys.stdout.flush()
+            return tty.readline().strip().lower() in ("y", "yes")
+    except (EOFError, OSError):
+        return False
 
 def do_install(asset, assets, dest_dir, binary=None):
     with tempfile.TemporaryDirectory() as tmp:
