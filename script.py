@@ -3,7 +3,7 @@ import os, sys, json, hashlib, platform, subprocess, shutil, tarfile, zipfile
 import tempfile, urllib.request
 from pathlib import Path
 
-API  = "https://api.github.com/repos/xmrig/xmrig/releases/latest"
+API = "https://api.github.com/repos/xmrig/xmrig/releases/latest"
 
 def fetch(url):
     req = urllib.request.Request(url, headers={"User-Agent": "xmrig-updater"})
@@ -18,16 +18,14 @@ def ubuntu_codename():
     try:
         for line in Path("/etc/os-release").read_text().splitlines():
             if line.startswith("VERSION_CODENAME="):
-                name = line.split("=",1)[1].strip().strip('"')
+                name = line.split("=", 1)[1].strip().strip('"')
                 if name in ("focal", "jammy", "noble"): return name
     except: pass
 
 def platform_keyword():
     s, m = platform.system().lower(), platform.machine().lower()
     arch = "arm64" if "aarch64" in m or "arm64" in m else "x64"
-    if s == "linux":
-        kw = f"{ubuntu_codename() or 'linux-static'}-x64"
-        return kw, ".tar.gz"
+    if s == "linux":   return f"{ubuntu_codename() or 'linux-static'}-x64", ".tar.gz"
     if s == "windows": return f"windows-{arch}", ".zip"
     if s == "darwin":  return f"macos-{arch}", ".tar.gz"
     raise RuntimeError(f"Unsupported OS: {s}")
@@ -66,39 +64,47 @@ def ask(q):
     try:
         if sys.stdin.isatty():
             return input(f"{q} [y/N]: ").strip().lower() in ("y", "yes")
-        with open("/dev/tty") as tty:
+        tty_path = "CONIN$" if platform.system() == "Windows" else "/dev/tty"
+        with open(tty_path) as tty:
             sys.stdout.write(f"{q} [y/N]: ")
             sys.stdout.flush()
             return tty.readline().strip().lower() in ("y", "yes")
     except (EOFError, OSError):
         return False
 
-def do_install(asset, assets, dest_dir, binary=None):
+def do_install(asset, assets, dest, binary=None):
     with tempfile.TemporaryDirectory() as tmp:
         arc = Path(tmp) / asset["name"]
         print(f"  Downloading {asset['name']}...")
         urllib.request.urlretrieve(asset["browser_download_url"], arc)
         verify(arc, assets)
         src = Path(tmp) / "extracted"
-        if str(arc).endswith(".zip"): zipfile.ZipFile(arc).extractall(src)
-        else: tarfile.open(arc).extractall(src)
-        top = next((p for p in src.iterdir() if p.is_dir()), src)
+        if str(arc).endswith(".zip"):
+            zipfile.ZipFile(arc).extractall(src)
+        else:
+            tf = tarfile.open(arc)
+            if sys.version_info >= (3, 12):
+                tf.extractall(src, filter="data")
+            else:
+                tf.extractall(src)
+        top  = next((p for p in src.iterdir() if p.is_dir()), src)
+        dest = Path(binary.parent if binary else dest)
         bin_name = "xmrig.exe" if str(arc).endswith(".zip") else "xmrig"
 
-        if binary:  # update: replace binary only
-            mode = binary.stat().st_mode
-            shutil.copy2(next(top.rglob(bin_name)), binary)
-            os.chmod(binary, mode)
-            print(f"  Binary updated: {binary}")
-        else:       # fresh install: extract all, skip existing files
-            for item in top.iterdir():
-                dst = Path(dest_dir) / item.name
-                if not dst.exists():
-                    shutil.copy2(item, dst) if item.is_file() else shutil.copytree(item, dst)
-            os.chmod(Path(dest_dir) / bin_name, 0o755)
-            print(f"  Installed to: {dest_dir}")
+        for item in top.iterdir():
+            dst = dest / item.name
+            if dst.exists() and not binary:
+                continue  # fresh install: skip existing files
+            if item.is_dir():
+                if dst.exists(): shutil.rmtree(dst)
+                shutil.copytree(item, dst)
+            else:
+                shutil.copy2(item, dst)
 
-        cfg = (binary.parent if binary else Path(dest_dir)) / "config.json"
+        os.chmod(dest / bin_name, 0o755)
+        print(f"  {'Updated' if binary else 'Installed'}: {dest}")
+
+        cfg = dest / "config.json"
         if cfg.exists(): patch_config(cfg)
 
 def main():
